@@ -2,6 +2,7 @@ import os
 import tempfile
 from pathlib import Path
 from typing import BinaryIO
+
 from agentic_video_editor.application.ports.media_storage import MediaStorageError
 
 CHUNK_SIZE = 1024 * 1024
