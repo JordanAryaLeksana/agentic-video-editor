@@ -16,13 +16,13 @@ from agentic_video_editor.application.use_cases.ingest_media import IngestMediaU
 from agentic_video_editor.application.use_cases.register_media import (
     RegisterMediaUseCase,
 )
-from agentic_video_editor.bootstrap import build_ingest_media_use_case
+from agentic_video_editor.bootstrap import build_ingest_media_use_case, build_get_media_use_case
+from agentic_video_editor.application.use_cases.get_media import GetMediaUseCase
 from agentic_video_editor.infrastructure.persistence.model import Base
 from agentic_video_editor.bootstrap import build_register_media_use_case
 from agentic_video_editor.application.ports.media_probe import MediaProbeError
 from agentic_video_editor.application.ports.media_repository import MediaRepositoryError
 from agentic_video_editor.application.ports.media_storage import MediaStorageError
-
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
@@ -76,6 +76,11 @@ class MediaRegisteredResponse(BaseModel):
     filename: str
     size_bytes: int
 
+class MediaGetResponse(BaseModel):
+    media_id: UUID
+    filename: str
+    storage_key: str
+    size_bytes: int
 
 def get_register_media_use_case(
     request: Request,
@@ -85,6 +90,12 @@ def get_register_media_use_case(
         storage_root=request.app.state.storage_root,
     )
 
+def get_media_use_case(
+        request: Request
+) -> GetMediaUseCase:
+    return build_get_media_use_case(
+        session_factory=request.app.state.session_factory
+    )
 
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 CHUNK_SIZE = 1024 * 1024
@@ -94,6 +105,32 @@ CHUNK_SIZE = 1024 * 1024
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
+@app.get("/api/v1/media/{media_id}",response_model=MediaGetResponse)
+def get_media(
+    media_id: UUID, 
+    use_case: Annotated[
+        GetMediaUseCase,
+        Depends(get_media_use_case)
+    ]
+) -> MediaGetResponse:
+    asset = use_case.execute(
+        media_id=media_id
+    )
+    if asset is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Media Not Found"
+        )
+
+    return MediaGetResponse(
+        media_id=asset.id,
+        filename=asset.original_filename,
+        size_bytes=asset.size_bytes,
+        storage_key=asset.storage_key,
+    )
+
+
+    
 
 @app.post("/api/v1/media/probe", response_model=MediaProbeResponse)
 def probe_media(

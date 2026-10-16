@@ -18,7 +18,7 @@ from agentic_video_editor.infrastructure.persistence.sqlalchemy_media_repository
 from agentic_video_editor.infrastructure.storage.local_media_storage import (
     LocalMediaStorage,
 )
-
+from agentic_video_editor.application.use_cases.get_media import GetMediaUseCase
 
 def build_ingest_media_use_case() -> IngestMediaUseCases:
     ffprobe = FFProbeMediaProbe()
@@ -44,4 +44,14 @@ def build_register_media_use_case(
         media_probe=media_probe,
         media_storage=media_storage,
         media_repository=media_repository,
+    )
+
+
+def build_get_media_use_case(
+    session_factory: sessionmaker[Session]
+) -> GetMediaUseCase:
+    return GetMediaUseCase(
+        media_repository=SQLAlchemyMediaRepository(
+            session_factory
+        )
     )
