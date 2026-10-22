@@ -28,6 +28,9 @@ from agentic_video_editor.infrastructure.persistence.sqlalchemy_processing_job_r
     SQLAlchemyPreprocessingJob
 )
 
+from agentic_video_editor.application.use_cases.get_preprocessing_job import (
+    GetProcessingJobUseCase,
+)
 def build_ingest_media_use_case() -> IngestMediaUseCases:
     ffprobe = FFProbeMediaProbe()
 
@@ -71,6 +74,15 @@ def build_create_processing_job_use_case(
         media_repository=SQLAlchemyMediaRepository(
             session_factory
         ),
+        job_repository=SQLAlchemyPreprocessingJob(
+            session_factory
+        )
+    )
+
+def build_get_processing_job_use_case(
+        session_factory: sessionmaker[Session]
+) -> GetProcessingJobUseCase:
+    return GetProcessingJobUseCase(
         job_repository=SQLAlchemyPreprocessingJob(
             session_factory
         )

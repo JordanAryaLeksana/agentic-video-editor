@@ -39,6 +39,13 @@ from agentic_video_editor.domain.processing_job import (
     JobType,
 )
 
+from agentic_video_editor.application.use_cases.get_preprocessing_job import (
+    GetProcessingJobUseCase,
+)
+from agentic_video_editor.bootstrap import (
+    build_get_processing_job_use_case,
+)
+
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
@@ -133,6 +140,14 @@ def get_create_processing_job_use_case(
     return build_create_processing_job_use_case(
         session_factory=request.app.state.session_factory,
     )
+
+def get_processing_job_use_case(
+    request: Request,
+) -> GetProcessingJobUseCase:
+    return build_get_processing_job_use_case(
+        session_factory=request.app.state.session_factory,
+    )
+
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 CHUNK_SIZE = 1024 * 1024
 
@@ -298,6 +313,44 @@ def create_preprocessing_job(
             status_code=500,
             detail="Unable to create processing job",
         ) from exc
+
+    return ProcessingJobCreatedResponse(
+        job_id=job.id,
+        media_id=job.media_id,
+        job_type=job.job_type,
+        status=job.status,
+        attempts=job.attempts,
+        max_attempts=job.max_attempts,
+    )
+
+
+@app.get(
+    "/api/v1/jobs/{job_id}",
+    response_model=ProcessingJobCreatedResponse,
+)
+def get_processing_job(
+    job_id: UUID,
+    use_case: Annotated[
+        GetProcessingJobUseCase,
+        Depends(get_processing_job_use_case),
+    ],
+) -> ProcessingJobCreatedResponse:
+    try:
+        job = use_case.execute(job_id)
+
+    except ProcessingJobRepositoryError as exc:
+        logger.exception("Failed to retrieve processing job")
+
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to retrieve processing job",
+        ) from exc
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Processing job not found",
+        )
 
     return ProcessingJobCreatedResponse(
         job_id=job.id,

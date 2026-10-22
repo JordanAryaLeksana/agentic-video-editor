@@ -105,3 +105,57 @@ def test_create_job_invalid_job_type(job_api_client):
     )
 
     assert response.status_code == 422
+
+
+def test_get_processing_job_success(job_api_client):
+    client, media_id = job_api_client
+
+    # Arrange: Create a processing job first.
+    create_response = client.post(
+        f"/api/v1/media/{media_id}/jobs",
+        json={"job_type": "generate_thumbnail"},
+    )
+
+    assert create_response.status_code == 201
+
+    job_id = create_response.json()["job_id"]
+
+    # Act: Retrieve the same job.
+    response = client.get(
+        f"/api/v1/jobs/{job_id}"
+    )
+
+    # Assert: Job must exist and remain pending.
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert payload["job_id"] == job_id
+    assert payload["media_id"] == str(media_id)
+    assert payload["job_type"] == "generate_thumbnail"
+    assert payload["status"] == "pending"
+    assert payload["attempts"] == 0
+    assert payload["max_attempts"] == 3
+
+
+def test_get_processing_job_not_found(job_api_client):
+    client, _ = job_api_client
+
+    response = client.get(
+        f"/api/v1/jobs/{uuid4()}"
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == (
+        "Processing job not found"
+    )
+
+
+def test_get_processing_job_invalid_uuid(job_api_client):
+    client, _ = job_api_client
+
+    response = client.get(
+        "/api/v1/jobs/not-a-valid-uuid"
+    )
+
+    assert response.status_code == 422
