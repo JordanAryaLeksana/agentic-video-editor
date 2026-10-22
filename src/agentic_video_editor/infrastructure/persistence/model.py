@@ -1,5 +1,6 @@
 from sqlalchemy import BigInteger, CheckConstraint, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import CheckConstraint, ForeignKey, Integer, String
 
 
 class Base(DeclarativeBase):
@@ -23,3 +24,52 @@ class MediaAssetRecord(Base):
     storage_key: Mapped[str] = mapped_column(String, unique=True, nullable=False)
 
     size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+
+class ProcessingJobRecord(Base):
+    __tablename__ = "processing_job"
+
+    __table_args__ = (
+        CheckConstraint(
+            "max_attempts >= 1",
+            name="ck_processing_jobs_max_attempts",
+        ),
+        CheckConstraint(
+            "attempts >= 0 AND attempts <= max_attempts",
+            name="ck_processing_jobs_attempts",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+    )
+
+    media_id: Mapped[str] = mapped_column(
+        ForeignKey("media_assets.id"),
+        nullable=False,
+        index=True,
+    )
+
+    job_type: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        index=True,
+    )
+
+    attempts: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+
+    max_attempts: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=3,
+    )

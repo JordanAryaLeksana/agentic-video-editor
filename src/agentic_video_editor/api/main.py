@@ -23,6 +23,22 @@ from agentic_video_editor.bootstrap import build_register_media_use_case
 from agentic_video_editor.application.ports.media_probe import MediaProbeError
 from agentic_video_editor.application.ports.media_repository import MediaRepositoryError
 from agentic_video_editor.application.ports.media_storage import MediaStorageError
+from agentic_video_editor.infrastructure.persistence.sqlite import configure_sqlite_foreign_keys
+from agentic_video_editor.application.ports.processing_job_repository import (
+    ProcessingJobRepositoryError,
+)
+from agentic_video_editor.application.use_cases.create_processing_job import (
+    CreateProcessingJobUseCase,
+    MediaNotFoundError,
+)
+from agentic_video_editor.bootstrap import (
+    build_create_processing_job_use_case,
+)
+from agentic_video_editor.domain.processing_job import (
+    JobStatus,
+    JobType,
+)
+
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
@@ -40,6 +56,8 @@ async def lifespan(app:FastAPI):
         f"sqlite+pysqlite:///{database_path}",
         connect_args={"check_same_thread": False},
     )
+
+    configure_sqlite_foreign_keys(engine)
 
     Base.metadata.create_all(engine)
 
@@ -82,6 +100,18 @@ class MediaGetResponse(BaseModel):
     storage_key: str
     size_bytes: int
 
+class CreateProcessingJobRequest(BaseModel):
+    job_type: JobType
+
+
+class ProcessingJobCreatedResponse(BaseModel):
+    job_id: UUID
+    media_id: UUID
+    job_type: JobType
+    status: JobStatus
+    attempts: int
+    max_attempts: int
+
 def get_register_media_use_case(
     request: Request,
 ) -> RegisterMediaUseCase:
@@ -97,6 +127,12 @@ def get_media_use_case(
         session_factory=request.app.state.session_factory
     )
 
+def get_create_processing_job_use_case(
+    request: Request,
+) -> CreateProcessingJobUseCase:
+    return build_create_processing_job_use_case(
+        session_factory=request.app.state.session_factory,
+    )
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 CHUNK_SIZE = 1024 * 1024
 
@@ -233,3 +269,41 @@ def register_media(
             filename=asset.original_filename,
             size_bytes=asset.size_bytes,
         )
+
+
+@app.post("/api/v1/media/{media_id}/jobs", response_model=ProcessingJobCreatedResponse, status_code=201)
+def create_preprocessing_job(
+    media_id: UUID,
+    payload: CreateProcessingJobRequest,
+    use_case:Annotated[
+        CreateProcessingJobUseCase,
+        Depends(get_create_processing_job_use_case)
+        ]
+) -> ProcessingJobCreatedResponse:
+    try:
+        job = use_case.execute(
+            media_id=media_id,
+            job_type=payload.job_type
+        )
+    except MediaNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail="Media Not Found"
+        ) from exc
+
+    except (MediaRepositoryError, ProcessingJobRepositoryError) as exc:
+        logger.exception("Failed to create processing job")
+
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to create processing job",
+        ) from exc
+
+    return ProcessingJobCreatedResponse(
+        job_id=job.id,
+        media_id=job.media_id,
+        job_type=job.job_type,
+        status=job.status,
+        attempts=job.attempts,
+        max_attempts=job.max_attempts,
+    )

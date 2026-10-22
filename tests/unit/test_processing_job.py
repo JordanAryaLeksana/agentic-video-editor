@@ -18,7 +18,7 @@ def test_new_job_is_pending():
     assert job.attempts == 0
     assert job.max_attempts == 3
 
-def test_reject_invalid_max_attemps():
+def test_reject_invalid_max_attempts():
     with pytest.raises(ValueError):
         ProcessingJob(
             id=uuid4(),
@@ -28,7 +28,7 @@ def test_reject_invalid_max_attemps():
         )
 
 
-def test_reject_attemps_above_limit():
+def test_reject_attempts_above_limit():
     with pytest.raises(ValueError):
         ProcessingJob(
             id=uuid4(),

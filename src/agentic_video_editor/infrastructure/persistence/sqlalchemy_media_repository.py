@@ -8,6 +8,8 @@ from agentic_video_editor.domain.media_asset import MediaAsset
 from agentic_video_editor.infrastructure.persistence.model import MediaAssetRecord
 
 
+
+
 class SQLAlchemyMediaRepository:
     def __init__(self, session_factory: sessionmaker):
         self.session_factory = session_factory
@@ -43,3 +45,5 @@ class SQLAlchemyMediaRepository:
                 )
         except SQLAlchemyError as exc:
             raise MediaRepositoryError("Unable to retrieve media asset") from exc
+
+
