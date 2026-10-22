@@ -22,8 +22,12 @@ from agentic_video_editor.infrastructure.persistence.sqlite import (
 from agentic_video_editor.infrastructure.persistence.sqlalchemy_processing_job_repository import (
     SQLAlchemyPreprocessingJob,
 )
-
-
+from agentic_video_editor.domain.processing_job import (
+    JobStatus,
+    JobType,
+    ProcessingJob,
+)
+from concurrent.futures import ThreadPoolExecutor
 @pytest.fixture
 def job_repository(tmp_path):
     database_path = tmp_path / "jobs.db"
@@ -113,3 +117,65 @@ def test_reject_job_with_missing_media(job_repository):
         repository.save(job)
 
     assert repository.get_by_id(job.id) is None
+
+def test_claim_pending_job_once(job_repository):
+    repository, media_id = job_repository
+
+    job = ProcessingJob(
+        id=uuid4(),
+        media_id=media_id,
+        job_type=JobType.GENERATE_THUMBNAIL,
+    )
+
+    repository.save(job)
+
+    claimed = repository.claim_next_pending()
+
+    assert claimed is not None
+    assert claimed.id == job.id
+    assert claimed.status == JobStatus.RUNNING
+    assert claimed.attempts == 1
+
+    # Claiming again must not return the same job.
+    second_claim = repository.claim_next_pending()
+
+    assert second_claim is None
+
+    # The updated state must be persisted.
+    stored_job = repository.get_by_id(job.id)
+
+    assert stored_job == claimed
+
+
+def test_two_workers_cannot_claim_same_job(job_repository):
+    repository, media_id = job_repository
+
+    job = ProcessingJob(
+        id=uuid4(),
+        media_id=media_id,
+        job_type=JobType.GENERATE_THUMBNAIL,
+    )
+
+    repository.save(job)
+
+    # Simulate two workers trying to claim work.
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(
+            executor.map(
+                lambda _: repository.claim_next_pending(),
+                range(2),
+            )
+        )
+
+    successful_claims = [
+        result for result in results if result is not None
+    ]
+
+    assert len(successful_claims) == 1
+    assert successful_claims[0].id == job.id
+
+    stored_job = repository.get_by_id(job.id)
+
+    assert stored_job is not None
+    assert stored_job.status == JobStatus.RUNNING
+    assert stored_job.attempts == 1

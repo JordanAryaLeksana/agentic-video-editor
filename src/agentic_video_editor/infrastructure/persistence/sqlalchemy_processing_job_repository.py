@@ -1,4 +1,5 @@
 from uuid import UUID
+from sqlalchemy import select, update
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import SQLAlchemyError
 from agentic_video_editor.domain.processing_job import (
@@ -7,7 +8,11 @@ from agentic_video_editor.domain.processing_job import (
     ProcessingJob,
 )
 from agentic_video_editor.infrastructure.persistence.model import ProcessingJobRecord
-from agentic_video_editor.application.ports.processing_job_repository import ProcessingJobRepositoryError
+from agentic_video_editor.application.ports.processing_job_repository import (
+    ProcessingJobRepositoryError,
+)
+
+
 class SQLAlchemyPreprocessingJob:
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self.session_factory = session_factory
@@ -21,21 +26,16 @@ class SQLAlchemyPreprocessingJob:
                     job_type=job.job_type.value,
                     status=job.status.value,
                     attempts=job.attempts,
-                    max_attempts= job.max_attempts,
+                    max_attempts=job.max_attempts,
                 )
                 session.add(record)
         except SQLAlchemyError as exc:
-            raise ProcessingJobRepositoryError(
-                "Failed to save processing job"
-            ) from exc
+            raise ProcessingJobRepositoryError("Failed to save processing job") from exc
 
-    def get_by_id(self, job_id:UUID) -> ProcessingJob|None:
+    def get_by_id(self, job_id: UUID) -> ProcessingJob | None:
         try:
             with self.session_factory.begin() as session:
-                record = session.get(
-                    ProcessingJobRecord,
-                    str(job_id)
-                )
+                record = session.get(ProcessingJobRecord, str(job_id))
 
                 if record is None:
                     return None
@@ -46,9 +46,63 @@ class SQLAlchemyPreprocessingJob:
                     job_type=JobType(record.job_type),
                     status=JobStatus(record.status),
                     attempts=record.attempts,
-                    max_attempts=record.max_attempts
+                    max_attempts=record.max_attempts,
                 )
-        except (SQLAlchemyError, ValueError ) as exc:
+        except (SQLAlchemyError, ValueError) as exc:
             raise ProcessingJobRepositoryError(
                 "Failed to retrieve processing job"
+            ) from exc
+
+    def claim_next_pending(self) -> ProcessingJob | None:
+        try:
+            with self.session_factory.begin() as session:
+                candidate = (
+                    select(ProcessingJobRecord.id)
+                    .where(
+                        ProcessingJobRecord.status == candidate,
+                        ProcessingJobRecord.attempts < ProcessingJobRecord.max_attempts,
+                    )
+                    .order_by(ProcessingJobRecord.id)
+                    .limit(1)
+                    .scalar_subquery()
+                )
+
+                statement = (
+                    update(ProcessingJobRecord)
+                    .where(
+                        ProcessingJobRecord.id == candidate,
+                        ProcessingJobRecord.status == JobStatus.PENDING.value,
+                        ProcessingJobRecord.attempts < ProcessingJobRecord.max_attempts,
+                    )
+                    .values(
+                        status=JobStatus.RUNNING.value,
+                        attemps=ProcessingJobRecord.attempts + 1,
+                    )
+                    .returning(
+                        ProcessingJobRecord.id,
+                        ProcessingJobRecord.media_id,
+                        ProcessingJobRecord.job_type,
+                        ProcessingJobRecord.status,
+                        ProcessingJobRecord.attempts,
+                        ProcessingJobRecord.max_attempts,
+                    )
+                )
+
+                row = session.execute(statement).one_or_none()
+
+                if row is None:
+                    return None
+
+                return ProcessingJob(
+                    id=UUID(row.id),
+                    media_id=UUID(row.media_id),
+                    job_type=JobType(row.job_type),
+                    status=JobStatus(row.status),
+                    attempts=row.attempts,
+                    max_attempts=row.max_attempts,
+                )
+
+        except (SQLAlchemyError, ValueError) as exc:
+            raise ProcessingJobRepositoryError(
+                "Failed to claim processing job"
             ) from exc

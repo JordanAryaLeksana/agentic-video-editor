@@ -21,3 +21,6 @@ class ProcessingJobRepository(Protocol):
     ) -> ProcessingJob | None:
         """Retrieve a processing job by its ID."""
         ...
+
+    def claim_next_pendind(self) -> ProcessingJob | None:
+         """Atomically claim one pending job."""
