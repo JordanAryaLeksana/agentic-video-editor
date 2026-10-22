@@ -179,3 +179,105 @@ def test_two_workers_cannot_claim_same_job(job_repository):
     assert stored_job is not None
     assert stored_job.status == JobStatus.RUNNING
     assert stored_job.attempts == 1
+
+
+
+def test_mark_job_succeeded(job_repository):
+    repository, media_id = job_repository
+
+    job = ProcessingJob(
+        id=uuid4(),
+        media_id=media_id,
+        job_type=JobType.GENERATE_THUMBNAIL,
+    )
+    repository.save(job)
+
+    claimed = repository.claim_next_pending()
+    assert claimed is not None
+
+    result = repository.mark_succeeded(
+        claimed.id,
+        claimed.attempts,
+    )
+
+    assert result is True
+
+    stored = repository.get_by_id(job.id)
+    assert stored is not None
+    assert stored.status == JobStatus.SUCCEEDED
+
+    # A completed job cannot be completed again.
+    assert repository.mark_succeeded(
+        claimed.id, claimed.attempts
+    ) is False
+
+
+def test_mark_job_failed(job_repository):
+    repository, media_id = job_repository
+
+    job = ProcessingJob(
+        id=uuid4(),
+        media_id=media_id,
+        job_type=JobType.GENERATE_THUMBNAIL,
+    )
+    repository.save(job)
+
+    claimed = repository.claim_next_pending()
+    assert claimed is not None
+
+    assert repository.mark_failed(
+        claimed.id,
+        claimed.attempts,
+    ) is True
+
+    stored = repository.get_by_id(job.id)
+    assert stored is not None
+    assert stored.status == JobStatus.FAILED
+
+
+def test_reject_incorrect_attempt(job_repository):
+    repository, media_id = job_repository
+
+    job = ProcessingJob(
+        id=uuid4(),
+        media_id=media_id,
+        job_type=JobType.GENERATE_THUMBNAIL,
+    )
+    repository.save(job)
+
+    claimed = repository.claim_next_pending()
+    assert claimed is not None
+
+    result = repository.mark_succeeded(
+        job_id=claimed.id,
+        attempt=claimed.attempts + 1,
+    )
+
+    assert result is False
+
+    stored = repository.get_by_id(job.id)
+    assert stored is not None
+    assert stored.status == JobStatus.RUNNING
+
+
+def test_pending_job_cannot_complete(job_repository):
+    repository, media_id = job_repository
+
+    job = ProcessingJob(
+        id=uuid4(),
+        media_id=media_id,
+        job_type=JobType.GENERATE_THUMBNAIL,
+    )
+    repository.save(job)
+
+    # No worker has claimed this job yet.
+    result = repository.mark_succeeded(
+        job_id=job.id,
+        attempt=1,
+    )
+
+    assert result is False
+
+    stored = repository.get_by_id(job.id)
+    assert stored is not None
+    assert stored.status == JobStatus.PENDING

@@ -106,3 +106,62 @@ class SQLAlchemyPreprocessingJob:
             raise ProcessingJobRepositoryError(
                 "Failed to claim processing job"
             ) from exc
+
+        
+    def mark_succeeded(
+        self,
+        job_id: UUID,
+        attempt: int,
+    ) -> bool:
+        return self._finish_job(
+            job_id=job_id,
+            attempt=attempt,
+            status=JobStatus.SUCCEEDED,
+        )
+
+
+    def mark_failed(
+        self,
+        job_id: UUID,
+        attempt: int,
+    ) -> bool:
+        return self._finish_job(
+            job_id=job_id,
+            attempt=attempt,
+            status=JobStatus.FAILED,
+        )
+
+
+    def _finish_job(
+        self,
+        job_id: UUID,
+        attempt: int,
+        status: JobStatus,
+    ) -> bool:
+        if attempt < 1:
+            raise ValueError("attempt must be at least 1")
+
+        try:
+            with self._session_factory.begin() as session:
+                statement = (
+                    update(ProcessingJobRecord)
+                    .where(
+                        ProcessingJobRecord.id == str(job_id),
+                        ProcessingJobRecord.status
+                        == JobStatus.RUNNING.value,
+                        ProcessingJobRecord.attempts == attempt,
+                    )
+                    .values(status=status.value)
+                    .returning(ProcessingJobRecord.id)
+                )
+
+                updated_id = session.execute(
+                    statement
+                ).scalar_one_or_none()
+
+                return updated_id is not None
+
+        except SQLAlchemyError as exc:
+            raise ProcessingJobRepositoryError(
+                "Failed to update processing job status"
+            ) from exc

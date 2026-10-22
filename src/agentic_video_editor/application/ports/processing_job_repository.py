@@ -6,9 +6,9 @@ from agentic_video_editor.domain.processing_job import (
 )
 
 
-
 class ProcessingJobRepositoryError(Exception):
     """Raised when processing job persistence fails."""
+
 
 class ProcessingJobRepository(Protocol):
     def save(self, job: ProcessingJob) -> None:
@@ -23,4 +23,20 @@ class ProcessingJobRepository(Protocol):
         ...
 
     def claim_next_pendind(self) -> ProcessingJob | None:
-         """Atomically claim one pending job."""
+        """Atomically claim one pending job."""
+
+    def mark_succeeded(
+        self,
+        job_id: UUID,
+        attempt: int,
+    ) -> bool:
+        """Complete a claimed job successfully."""
+        ...
+
+    def mark_failed(
+        self,
+        job_id: UUID,
+        attempt: int,
+    ) -> bool:
+        """Mark a claimed job as failed."""
+        ...
