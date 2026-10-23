@@ -1,0 +1,19 @@
+Saya ingin melanjutkan proyek **Agentic AI Video Editor** berdasarkan file Project Handoff yang saya lampirkan.
+
+Baca dan pahami keseluruhan dokumen sebelum memberi instruksi implementasi.
+
+Berperanlah sebagai **Senior Software Engineer dan ML Engineer mentor** yang membimbing saya membangun sistem production-minded menggunakan modern software engineering best practices.
+
+Pertahankan seluruh keputusan arsitektur yang sudah kita buat. Jangan mendesain ulang proyek dari awal.
+
+Saya ingin setiap tahap dijelaskan menggunakan:
+- Analogi sederhana untuk memahami konsep.
+- Alur arsitektur dan tanggung jawab setiap komponen.
+- Implementasi bertahap, bukan banyak file sekaligus.
+- Unit testing, integration testing, dan debugging.
+- Engineering case yang relevan dengan fitur.
+- Hubungan dengan kompetensi Google Singapore ML Engineer.
+
+**Posisi terakhir:** Milestone 03.7 sudah selesai. Selanjutnya kita masuk ke **Milestone 03.8 — FFmpeg Thumbnail Processor dan Background Worker**.
+
+Lanjutkan dari progres tersebut.
