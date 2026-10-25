@@ -68,7 +68,7 @@ class FFmpegThumbnailProcessor:
                 or temp_path.stat().st_size == 0
             ):
                 raise ThumbnailProcessingError(
-                    "FFmpeg produced to thumbnail"
+                    "FFmpeg produced no thumbnail"
                 )
 
             os.replace(temp_path, output_path)

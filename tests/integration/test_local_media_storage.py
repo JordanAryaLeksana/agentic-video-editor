@@ -64,3 +64,22 @@ def test_reject_duplicate_storage_key(tmp_path):
 
     with storage.open(key) as stored_file:
         assert stored_file.read() == b"original"
+
+
+def test_path_for_processing(tmp_path):
+    # Arrange
+    storage_root = tmp_path / "media"
+    storage = LocalMediaStorage(storage_root)
+
+    key = "videos/test/source.mp4"
+    content = b"sample video bytes"
+
+    storage.save(key, BytesIO(content))
+
+    # Act
+    path = storage.path_for_processing(key)
+
+    # Assert
+    assert path.is_file()
+    assert path == storage_root / key
+    assert path.read_bytes() == content

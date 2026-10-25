@@ -90,3 +90,12 @@ class LocalMediaStorage:
             return path.unlink(missing_ok=True)
         except OSError as exc:
             raise MediaStorageError(f"unable to delete media: {key}") from exc
+    def path_for_processing(self, key: str) -> Path:
+        path = self._resolve_key(key)
+
+        if not path.is_file():
+            raise MediaStorageError(
+                f"Media file does not exist: {key}"
+            )
+
+        return path

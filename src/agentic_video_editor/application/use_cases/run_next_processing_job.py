@@ -49,7 +49,7 @@ class RunNextProcessingJob:
         try:
             self.handler.handle(job)
 
-        except Exception:
+        except Exception as exc:
             logger.exception(
                 "Processing failed for job %s",
                 job.id,
@@ -60,10 +60,13 @@ class RunNextProcessingJob:
             )
 
             if not updated:
-                logger.warning(
-                    "Could not mark job %s as failed",
+                logger.error(
+                    "Could not mark job %s as succeeded",
                     job.id,
                 )
+                raise RuntimeError(
+                    f"Could not mark job {job.id} as succeeded"
+                ) from exc
 
             return True
 

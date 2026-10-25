@@ -59,7 +59,7 @@ class SQLAlchemyPreprocessingJob:
                 candidate = (
                     select(ProcessingJobRecord.id)
                     .where(
-                        ProcessingJobRecord.status == candidate,
+                        ProcessingJobRecord.status == JobStatus.PENDING.value,
                         ProcessingJobRecord.attempts < ProcessingJobRecord.max_attempts,
                     )
                     .order_by(ProcessingJobRecord.id)
@@ -76,7 +76,7 @@ class SQLAlchemyPreprocessingJob:
                     )
                     .values(
                         status=JobStatus.RUNNING.value,
-                        attemps=ProcessingJobRecord.attempts + 1,
+                        attempts=ProcessingJobRecord.attempts + 1,
                     )
                     .returning(
                         ProcessingJobRecord.id,
@@ -142,7 +142,7 @@ class SQLAlchemyPreprocessingJob:
             raise ValueError("attempt must be at least 1")
 
         try:
-            with self._session_factory.begin() as session:
+            with self.session_factory.begin() as session:
                 statement = (
                     update(ProcessingJobRecord)
                     .where(
